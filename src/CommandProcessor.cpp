@@ -12,6 +12,7 @@ namespace
 {
 
 using ctrl::CommandProcessor;
+using motion::MotionPhase;
 
 constexpr std::string_view kWhitespace(" \t\r\n");
 
@@ -28,15 +29,15 @@ std::string_view Trim(std::string_view value)
   return value;
 }
 
-const char *MotionStateLabel(CommandProcessor::MotionState state)
+const char *MotionStateLabel(MotionPhase state)
 {
   switch (state)
   {
-  case CommandProcessor::MotionState::Idle:
+  case MotionPhase::Idle:
     return "IDLE";
-  case CommandProcessor::MotionState::Moving:
+  case MotionPhase::Moving:
     return "MOVING";
-  case CommandProcessor::MotionState::Homing:
+  case MotionPhase::Homing:
     return "HOMING";
   }
   return "UNKNOWN";
@@ -66,6 +67,12 @@ const char *ResponseCodeLabel(CommandProcessor::ResponseCode code)
     return "ERR_INVALID_ARGUMENT";
   case CommandProcessor::ResponseCode::NotReady:
     return "ERR_NOT_READY";
+  case CommandProcessor::ResponseCode::LimitViolation:
+    return "ERR_LIMIT";
+  case CommandProcessor::ResponseCode::Busy:
+    return "ERR_BUSY";
+  case CommandProcessor::ResponseCode::DriverFault:
+    return "ERR_DRIVER_FAULT";
   }
   return "ERR_UNKNOWN";
 }
@@ -80,7 +87,7 @@ struct CommandHelp
 constexpr CommandHelp kCommandHelp[] = {
     {"HELP", "HELP", "List supported verbs and payload formats."},
     {"MOVE", "MOVE:<channel>,<position>[,<speed>[,<accel>]]", "Queue an absolute move with optional speed/accel overrides."},
-    {"HOME", "HOME:<channel>", "Initiate the homing routine for the provided channel."},
+    {"HOME", "HOME:<channel>[,<travel>[,<backoff>]]", "Initiate the homing routine with optional travel/backoff overrides."},
     {"STATUS", "STATUS[:<channel>]", "Report state, position, and last error for one or all motors."},
     {"SLEEP", "SLEEP:<channel>", "Force a motor channel into low-power sleep."},
     {"WAKE", "WAKE:<channel>", "Wake a motor channel before additional commands."}};
@@ -97,16 +104,8 @@ CommandProcessor::CommandProcessor()
 
 void CommandProcessor::reset()
 {
-  for (auto &motor : motors_)
-  {
-    motor.position = 0;
-    motor.targetPosition = 0;
-    motor.speedHz = kDefaultSpeedHz;
-    motor.acceleration = kDefaultAcceleration;
-    motor.state = MotionState::Idle;
-    motor.asleep = true;
-    motor.lastError = ResponseCode::Ok;
-  }
+  motorManager_.reset();
+  lastResponseCodes_.fill(ResponseCode::Ok);
 }
 
 void CommandProcessor::processLine(std::string_view rawLine, Response &out)
@@ -185,7 +184,7 @@ void CommandProcessor::processLine(std::string_view rawLine, Response &out)
 
   if (std::string_view(verbBuffer) == "HOME")
   {
-    handleHome(out);
+    handleHome(payload, out);
     return;
   }
 
@@ -318,6 +317,21 @@ bool CommandProcessor::parseInt32(std::string_view token, int32_t &value)
   return true;
 }
 
+bool CommandProcessor::parseOptionalLong(std::string_view token, long &value)
+{
+  if (token.empty())
+  {
+    return true;
+  }
+  long parsed = 0;
+  if (!parseInt(token, parsed))
+  {
+    return false;
+  }
+  value = parsed;
+  return true;
+}
+
 void CommandProcessor::handleHelp(Response &out)
 {
   writeResponsePrefix(out, ResponseCode::Ok);
@@ -378,21 +392,44 @@ void CommandProcessor::handleMove(std::string_view payload, Response &out)
     }
   }
 
-  auto &motor = motors_[channel];
-  motor.targetPosition = position;
-  motor.position = position;
-  motor.speedHz = speed;
-  motor.acceleration = accel;
-  motor.state = MotionState::Idle;
-  motor.asleep = false;
-  motor.lastError = ResponseCode::Ok;
+  motion::TimingEstimate timing{};
+  motion::MoveResult result = motorManager_.queueMove(channel, position, speed, accel, timing);
 
+  if (result == motion::MoveResult::Busy)
+  {
+    writeResponsePrefix(out, ResponseCode::Busy);
+    appendLine(out, "MOVE:ERR=BUSY");
+    recordResponse(channel, ResponseCode::Busy);
+    return;
+  }
+
+  if (result == motion::MoveResult::Fault)
+  {
+    writeResponsePrefix(out, ResponseCode::DriverFault);
+    appendLine(out, "MOVE:ERR=DRIVER_FAULT");
+    recordResponse(channel, ResponseCode::DriverFault);
+    return;
+  }
+
+  const auto &state = motorManager_.state(channel);
   writeResponsePrefix(out, ResponseCode::Ok);
-  appendFormatted(out, "MOVE:CH=%u POS=%ld SPEED=%ld ACC=%ld",
+  recordResponse(channel, (result == motion::MoveResult::ClippedToLimit) ? ResponseCode::LimitViolation : ResponseCode::Ok);
+
+  appendFormatted(out, "MOVE:CH=%u POS=%ld TARGET=%ld STATE=%s",
                   static_cast<unsigned>(channel),
-                  position,
-                  static_cast<long>(speed),
-                  static_cast<long>(accel));
+                  state.position,
+                  state.targetPosition,
+                  MotionStateLabel(state.phase));
+  appendFormatted(out, "MOVE:SPEED=%ld ACC=%ld PLAN_US=%lu STEPS=%lu",
+                  static_cast<long>(state.speedHz),
+                  static_cast<long>(state.acceleration),
+                  static_cast<unsigned long>(timing.totalDurationUs),
+                  static_cast<unsigned long>(timing.totalSteps));
+
+  if (result == motion::MoveResult::ClippedToLimit)
+  {
+    appendLine(out, "MOVE:LIMIT_CLIPPED=1");
+  }
 }
 
 void CommandProcessor::handleSleep(std::string_view payload, Response &out)
@@ -410,10 +447,8 @@ void CommandProcessor::handleSleep(std::string_view payload, Response &out)
     return;
   }
 
-  auto &motor = motors_[channel];
-  motor.asleep = true;
-  motor.state = MotionState::Idle;
-  motor.lastError = ResponseCode::Ok;
+  motorManager_.forceSleep(channel);
+  recordResponse(channel, ResponseCode::Ok);
 
   writeResponsePrefix(out, ResponseCode::Ok);
   appendFormatted(out, "SLEEP:CH=%u STATE=SLEEP", static_cast<unsigned>(channel));
@@ -434,9 +469,9 @@ void CommandProcessor::handleWake(std::string_view payload, Response &out)
     return;
   }
 
-  auto &motor = motors_[channel];
-  motor.asleep = false;
-  motor.lastError = ResponseCode::Ok;
+  motorManager_.forceWake(channel);
+  motorManager_.clearFault(channel);
+  recordResponse(channel, ResponseCode::Ok);
 
   writeResponsePrefix(out, ResponseCode::Ok);
   appendFormatted(out, "WAKE:CH=%u STATE=AWAKE", static_cast<unsigned>(channel));
@@ -473,10 +508,78 @@ void CommandProcessor::handleStatus(std::string_view payload, Response &out)
   writeStatusForMotor(channel, out);
 }
 
-void CommandProcessor::handleHome(Response &out)
+void CommandProcessor::handleHome(std::string_view payload, Response &out)
 {
-  writeResponsePrefix(out, ResponseCode::NotReady);
-  appendLine(out, "HOME:ERR=PENDING_IMPLEMENTATION");
+  if (payload.empty())
+  {
+    writeResponsePrefix(out, ResponseCode::MissingPayload);
+    return;
+  }
+
+  std::array<std::string_view, kMaxTokens> tokens{};
+  std::size_t tokenCount = 0;
+  if (!tokenize(payload, tokens, tokenCount) || tokenCount < 1 || tokenCount > 3)
+  {
+    writeResponsePrefix(out, ResponseCode::ParseError);
+    return;
+  }
+
+  std::size_t channel = 0;
+  if (!parseChannel(tokens[0], channel))
+  {
+    writeResponsePrefix(out, ResponseCode::InvalidChannel);
+    return;
+  }
+
+  motion::HomingRequest request{};
+  request.travelRange = motion::MotorManager::kDefaultTravelRange;
+  request.backoff = motion::MotorManager::kDefaultBackoff;
+
+  if (tokenCount >= 2 && !tokens[1].empty())
+  {
+    long travel = request.travelRange;
+    if (!parseOptionalLong(tokens[1], travel) || travel <= 0)
+    {
+      writeResponsePrefix(out, ResponseCode::InvalidArgument);
+      return;
+    }
+    request.travelRange = travel;
+  }
+
+  if (tokenCount == 3 && !tokens[2].empty())
+  {
+    long backoff = request.backoff;
+    if (!parseOptionalLong(tokens[2], backoff) || backoff < 0)
+    {
+      writeResponsePrefix(out, ResponseCode::InvalidArgument);
+      return;
+    }
+    request.backoff = backoff;
+  }
+
+  motion::MoveResult result = motorManager_.beginHoming(channel, request);
+  if (result == motion::MoveResult::Busy)
+  {
+    writeResponsePrefix(out, ResponseCode::Busy);
+    appendLine(out, "HOME:ERR=BUSY");
+    recordResponse(channel, ResponseCode::Busy);
+    return;
+  }
+
+  if (result == motion::MoveResult::Fault)
+  {
+    writeResponsePrefix(out, ResponseCode::DriverFault);
+    appendLine(out, "HOME:ERR=DRIVER_FAULT");
+    recordResponse(channel, ResponseCode::DriverFault);
+    return;
+  }
+
+  recordResponse(channel, ResponseCode::Ok);
+  writeResponsePrefix(out, ResponseCode::Ok);
+  appendFormatted(out, "HOME:CH=%u RANGE=%ld BACKOFF=%ld",
+                  static_cast<unsigned>(channel),
+                  request.travelRange,
+                  request.backoff);
 }
 
 bool CommandProcessor::parseChannel(std::string_view token, std::size_t &channel)
@@ -494,18 +597,51 @@ bool CommandProcessor::parseChannel(std::string_view token, std::size_t &channel
   return true;
 }
 
+CommandProcessor::ResponseCode CommandProcessor::mapFault(motion::FaultCode fault) const
+{
+  switch (fault)
+  {
+  case motion::FaultCode::None:
+    return ResponseCode::Ok;
+  case motion::FaultCode::LimitClipped:
+    return ResponseCode::LimitViolation;
+  case motion::FaultCode::DriverFault:
+    return ResponseCode::DriverFault;
+  case motion::FaultCode::HomingTimeout:
+    return ResponseCode::NotReady;
+  }
+  return ResponseCode::InvalidArgument;
+}
+
+void CommandProcessor::recordResponse(std::size_t channel, ResponseCode code)
+{
+  if (channel >= kMotorCount)
+  {
+    return;
+  }
+  lastResponseCodes_[channel] = code;
+}
+
 void CommandProcessor::writeStatusForMotor(std::size_t channel, Response &out)
 {
-  const auto &motor = motors_[channel];
-  appendFormatted(out, "STATUS:CH=%u POS=%ld TARGET=%ld STATE=%s SLEEP=%u ERR=%s SPEED=%ld ACC=%ld",
+  const auto &state = motorManager_.state(channel);
+  ResponseCode code = lastResponseCodes_[channel];
+  if (state.fault != motion::FaultCode::None)
+  {
+    code = mapFault(state.fault);
+  }
+  appendFormatted(out, "STATUS:CH=%u POS=%ld TARGET=%ld STATE=%s SLEEP=%u ERR=%s SPEED=%ld ACC=%ld PLAN_US=%lu LIMIT=%u",
                   static_cast<unsigned>(channel),
-                  motor.position,
-                  motor.targetPosition,
-                  MotionStateLabel(motor.state),
-                  motor.asleep ? 1U : 0U,
-                  ResponseCodeLabel(motor.lastError),
-                  static_cast<long>(motor.speedHz),
-                  static_cast<long>(motor.acceleration));
+                  state.position,
+                  state.targetPosition,
+                  MotionStateLabel(state.phase),
+                  state.asleep ? 1U : 0U,
+                  ResponseCodeLabel(code),
+                  static_cast<long>(state.speedHz),
+                  static_cast<long>(state.acceleration),
+                  static_cast<unsigned long>(state.plannedDurationUs),
+                  state.limitClipped ? 1U : 0U);
 }
 
 } // namespace ctrl
+

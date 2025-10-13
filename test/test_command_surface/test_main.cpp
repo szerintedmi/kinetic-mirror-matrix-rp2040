@@ -59,16 +59,26 @@ void test_move_applies_speed_and_accel_overrides()
   ctrl::CommandProcessor::Response response{};
   processor.processLine("MOVE:1,120,5000,20000", response);
 
-  TEST_ASSERT_EQUAL_UINT(2, response.count);
+  TEST_ASSERT_EQUAL_UINT(3, response.count);
   TEST_ASSERT_EQUAL_STRING("CTRL:OK", response.lines[0].data());
-  TEST_ASSERT_EQUAL_STRING("MOVE:CH=1 POS=120 SPEED=5000 ACC=20000", response.lines[1].data());
+  std::string_view detail(GetLine(response, 1));
+  TEST_ASSERT_NOT_EQUAL(std::string_view::npos, detail.find("MOVE:CH=1"));
+  TEST_ASSERT_NOT_EQUAL(std::string_view::npos, detail.find("POS=0"));
+  TEST_ASSERT_NOT_EQUAL(std::string_view::npos, detail.find("TARGET=120"));
+  TEST_ASSERT_NOT_EQUAL(std::string_view::npos, detail.find("STATE=MOVING"));
+  std::string_view timing(GetLine(response, 2));
+  TEST_ASSERT_NOT_EQUAL(std::string_view::npos, timing.find("SPEED=5000"));
+  TEST_ASSERT_NOT_EQUAL(std::string_view::npos, timing.find("ACC=20000"));
+  TEST_ASSERT_NOT_EQUAL(std::string_view::npos, timing.find("PLAN_US="));
 
   const auto &state = processor.motorState(1);
-  TEST_ASSERT_EQUAL_INT32(120, static_cast<int32_t>(state.position));
+  TEST_ASSERT_EQUAL_INT32(0, static_cast<int32_t>(state.position));
   TEST_ASSERT_EQUAL_INT32(120, static_cast<int32_t>(state.targetPosition));
   TEST_ASSERT_EQUAL_INT32(5000, state.speedHz);
   TEST_ASSERT_EQUAL_INT32(20000, state.acceleration);
   TEST_ASSERT_FALSE(state.asleep);
+  TEST_ASSERT_EQUAL(motion::MotionPhase::Moving, state.phase);
+  TEST_ASSERT_GREATER_THAN_UINT32(0, state.plannedDurationUs);
 }
 
 void test_sleep_wake_toggle_persists_state()
@@ -105,8 +115,17 @@ void test_status_reports_structured_channel_data()
   processor.processLine("STATUS:0", response);
 
   TEST_ASSERT_EQUAL_STRING("CTRL:OK", GetLine(response, 0).data());
-  TEST_ASSERT_EQUAL_STRING("STATUS:CH=0 POS=222 TARGET=222 STATE=IDLE SLEEP=0 ERR=OK SPEED=4000 ACC=16000",
-                           GetLine(response, 1).data());
+  std::string_view status(GetLine(response, 1));
+  TEST_ASSERT_NOT_EQUAL(std::string_view::npos, status.find("STATUS:CH=0"));
+  TEST_ASSERT_NOT_EQUAL(std::string_view::npos, status.find("POS=0"));
+  TEST_ASSERT_NOT_EQUAL(std::string_view::npos, status.find("TARGET=222"));
+  TEST_ASSERT_NOT_EQUAL(std::string_view::npos, status.find("STATE=MOVING"));
+  TEST_ASSERT_NOT_EQUAL(std::string_view::npos, status.find("SLEEP=0"));
+  TEST_ASSERT_NOT_EQUAL(std::string_view::npos, status.find("ERR=OK"));
+  TEST_ASSERT_NOT_EQUAL(std::string_view::npos, status.find("SPEED=4000"));
+  TEST_ASSERT_NOT_EQUAL(std::string_view::npos, status.find("ACC=16000"));
+  TEST_ASSERT_NOT_EQUAL(std::string_view::npos, status.find("PLAN_US="));
+  TEST_ASSERT_NOT_EQUAL(std::string_view::npos, status.find("LIMIT=0"));
 
   response.count = 0;
   processor.processLine("STATUS:9", response);
