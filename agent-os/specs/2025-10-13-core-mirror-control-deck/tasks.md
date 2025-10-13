@@ -14,13 +14,13 @@ Assigned roles: api-engineer, testing-engineer
 **Assigned implementer:** api-engineer  
 **Dependencies:** None
 
-- [ ] 1.0 Establish serial command surface
-  - [ ] 1.1 Write 4 focused host-native tests covering `HELP`, absolute `MOVE` parameter validation (speed/accel overrides), `SLEEP`/`WAKE` toggles, and structured `STATUS` replies (2-8 tests max).
-  - [ ] 1.2 Review `planning/code-examples/StepperMotor.{h,cpp}` to capture reusable motion state and driver wake/sleep patterns.
-  - [ ] 1.3 Define command table and shared verb documentation aligned with `<VERB>[:payload]` format and echo prefixes.
-  - [ ] 1.4 Implement robust parser with payload length guards, argument coercion to motion profiles, and consistent error codes.
-  - [ ] 1.5 Wire status/error reporting paths so faults and acknowledgements return `CTRL:CODE`-style responses and update firmware README with command help output.
-  - [ ] 1.6 Run only the tests from 1.1 and confirm all pass.
+- [x] 1.0 Establish serial command surface
+  - [x] 1.1 Write 4 focused host-native tests covering `HELP`, absolute `MOVE` parameter validation (speed/accel overrides), `SLEEP`/`WAKE` toggles, and structured `STATUS` replies (2-8 tests max).
+  - [x] 1.2 Review `planning/code-examples/StepperMotor.{h,cpp}` to capture reusable motion state and driver wake/sleep patterns.
+  - [x] 1.3 Define command table and shared verb documentation aligned with `<VERB>[:payload]` format and echo prefixes.
+  - [x] 1.4 Implement robust parser with payload length guards, argument coercion to motion profiles, and consistent error codes.
+  - [x] 1.5 Wire status/error reporting paths so faults and acknowledgements return `CTRL:CODE`-style responses and update firmware README with command help output.
+  - [x] 1.6 Run only the tests from 1.1 and confirm all pass.
 
 **Acceptance Criteria:**
 
