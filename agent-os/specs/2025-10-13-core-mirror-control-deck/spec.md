@@ -15,6 +15,7 @@ Deliver RP2040 firmware that exposes a USB serial control deck capable of drivin
 - Track motor position internally and enforce configurable ±1200 full-step soft limits (midpoint at 0) per channel; reject or clip commands that exceed limits.
 - Implement a homing routine that leverages the configured travel range to re-establish zero and allows command overrides for approach/backoff distances while retaining default behaviors in code.
 - Manage autosleep: wake drivers immediately before motion, provide host-addressable `SLEEP`/`WAKE` verbs, and return motors to sleep as soon as motion completes.
+- Drive per-motor SLEEP pins through an SN74HC595 (or equivalent) shift register so eight drivers can be gated independently without exceeding the RP2040's available GPIO.
 - Surface structured status on demand, including current position, motion state, sleep state, and last error/fault code.
 - Support simultaneous stewardship of eight DRV8825 channels per RP2040, isolating state and error handling per motor.
 

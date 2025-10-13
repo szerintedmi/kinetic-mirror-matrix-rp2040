@@ -176,10 +176,10 @@ For each RELEVANT standards file you were instructed to follow:
 
 IMPORTANT: Ensure that your implementation work is ALIGNED and DOES NOT CONFLICT with the user's preferences and standards as detailed in the following files:
 
+@agent-os/standards/global/coding-style.md
+@agent-os/standards/global/conventions.md
 @agent-os/standards/global/platformio-project-setup.md
 @agent-os/standards/global/resource-management.md
-@agent-os/standards/global/conventions.md
-@agent-os/standards/global/coding-style.md
-@agent-os/standards/testing/unit-testing.md
+@agent-os/standards/testing/build-validation.md
 @agent-os/standards/testing/hardware-validation.md
-
+@agent-os/standards/testing/unit-testing.md

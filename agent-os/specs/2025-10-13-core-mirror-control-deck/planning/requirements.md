@@ -44,6 +44,7 @@ No visual assets provided. (`ls` check returned no image files.)
 - RP2040 firmware exposes a USB serial command interface for a single host laptop; no network transports in scope.
 - Command set must support absolute positioning moves with per-command speed and acceleration parameters, homing, explicit sleep/wake, status queries, and error reporting; relative moves are out of scope.
 - Firmware auto-sleeps motors when idle, wakes them for motion, and honors manual sleep/wake commands for driver calibration workflows.
+- RP2040 must drive per-motor SLEEP lines through an SN74HC595 (or equivalent) shift register so eight motors can sleep/wake independently without exhausting RP2040 GPIO pins.
 - Each RP2040 controls up to eight DRV8825 stepper channels with position tracking and enforcement of configured motion limits (-1200 to +1200 full steps, midpoint at 0).
 - Homing routine must use the configured ±1200 step travel limits to re-establish a zero reference; implementation can ship with sensible default approach/backoff distances but must allow overrides via serial command parameters using the same speed/acceleration defaults as normal moves.
 - Status responses expose key metrics on demand and report faults/errors over serial.

@@ -15,7 +15,7 @@ We're continuing our implementation of Core Mirror Control Deck by implementing 
   - [ ] 2.3 Author PIO program (and buffering glue) generating deterministic step/dir waves using compile-time buffers and double-queued command slots.
   - [ ] 2.4 Build motor manager tracking per-channel state, enforcing ±1200 step limits, and computing move durations from speed/accel inputs.
   - [ ] 2.5 Implement homing routine that leverages configurable travel range and defaults, ensuring overrides from serial parameters are honored.
-  - [ ] 2.6 Integrate autosleep: wake on motion demand, sleep immediately after motion completion, expose explicit SLEEP/WAKE verbs for calibration.
+  - [ ] 2.6 Integrate autosleep: wake on motion demand, sleep immediately after motion completion, expose explicit SLEEP/WAKE verbs for calibration, and drive per-motor SLEEP lines through an SN74HC595 (or equivalent) shift register to preserve RP2040 GPIO while keeping eight motors independently controllable.
   - [ ] 2.7 Run only the tests from 2.1 and ensure they pass.
 
 **Acceptance Criteria:**
@@ -23,7 +23,7 @@ We're continuing our implementation of Core Mirror Control Deck by implementing 
 - PIO pulse generation meets requested speed/accel profiles without jitter that would violate timing budget.
 - Each RP2040 instance controls eight motors with isolated state, respecting configured limits and reporting violations.
 - Homing establishes midpoint zero and surfaces success/error codes over serial.
-- Autosleep reliably gates DRV8825 sleep pins without leaving motors energized after moves.
+- Autosleep reliably gates DRV8825 sleep pins via the SN74HC595 outputs without leaving motors energized after moves, ensuring each motor can be controlled independently despite RP2040 GPIO limits.
 - Notes in code or README explain how RP2040 implementation draws from the ESP32 FastAccelStepper prototype while acknowledging MCU-specific differences.
 
 ## Understand the context
@@ -178,13 +178,13 @@ For each RELEVANT standards file you were instructed to follow:
 
 IMPORTANT: Ensure that your implementation work is ALIGNED and DOES NOT CONFLICT with the user's preferences and standards as detailed in the following files:
 
+@agent-os/standards/global/coding-style.md
+@agent-os/standards/global/conventions.md
 @agent-os/standards/global/platformio-project-setup.md
 @agent-os/standards/global/resource-management.md
-@agent-os/standards/global/conventions.md
-@agent-os/standards/global/coding-style.md
 @agent-os/standards/backend/data-persistence.md
 @agent-os/standards/backend/hardware-abstraction.md
 @agent-os/standards/backend/task-structure.md
-@agent-os/standards/testing/unit-testing.md
+@agent-os/standards/testing/build-validation.md
 @agent-os/standards/testing/hardware-validation.md
-
+@agent-os/standards/testing/unit-testing.md
