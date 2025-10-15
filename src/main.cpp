@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <string_view>
 
+#include "boards/Rp2040Pins.hpp"
 #include "control/CommandProcessor.hpp"
 
 namespace
@@ -14,6 +15,7 @@ ctrl::CommandProcessor gCommandProcessor;
 std::array<char, ctrl::CommandProcessor::kMaxCommandLength + 1> gBuffer{};
 std::size_t gBufferLength = 0;
 bool gBufferOverflow = false;
+uint32_t gLastServiceMicros = 0;
 
 void emitResponse(const ctrl::CommandProcessor::Response &response)
 {
@@ -51,11 +53,21 @@ void setup()
     delay(10);
   }
   gCommandProcessor.reset();
+  gCommandProcessor.configureShiftRegister(board::rp2040::kShiftRegisterPins);
+  gLastServiceMicros = micros();
   Serial.println("CTRL:READY");
 }
 
 void loop()
 {
+  const uint32_t now = micros();
+  const uint32_t elapsed = now - gLastServiceMicros;
+  gLastServiceMicros = now;
+  if (elapsed > 0)
+  {
+    gCommandProcessor.service(elapsed);
+  }
+
   while (Serial.available() > 0)
   {
     char incoming = static_cast<char>(Serial.read());

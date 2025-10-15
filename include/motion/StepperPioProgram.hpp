@@ -5,7 +5,15 @@
 #include <string_view>
 
 #if defined(ARDUINO_ARCH_RP2040) || defined(PICO_RP2040) || defined(PICO_PLATFORM)
+#if defined(__GNUC__)
+// Mute Pico SDK's ignored-qualifiers spam without losing warnings elsewhere.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wignored-qualifiers"
+#endif
 #include <hardware/pio.h>
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 #endif
 
 namespace motion::pio

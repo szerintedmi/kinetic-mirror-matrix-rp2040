@@ -481,10 +481,9 @@ void MotorManager::markCommandExecuted(std::size_t channel)
   commandSlots_[channel][activeSlot_[channel]] = CommandSlot{};
 }
 
-void MotorManager::configureShiftRegister(const ShiftRegisterPins &pins, bool activeHigh)
+void MotorManager::configureShiftRegister(const ShiftRegisterPins &pins)
 {
-  shiftActiveHigh_ = activeHigh;
-  sleepRegister_.configure(pins, activeHigh);
+  sleepRegister_.configure(pins);
   for (std::size_t i = 0; i < kMotorCount; ++i)
   {
     sleepRegister_.setChannel(i, motors_[i].asleep);
@@ -514,10 +513,9 @@ void MotorManager::exportCommandBuffer(std::size_t channel, pio::CommandBuffer &
   }
 }
 
-void MotorManager::SleepRegister::configure(const ShiftRegisterPins &pins, bool activeHigh)
+void MotorManager::SleepRegister::configure(const ShiftRegisterPins &pins)
 {
   pins_ = pins;
-  activeHigh_ = activeHigh;
   configured_ = (pins.data != 0 || pins.clock != 0 || pins.latch != 0);
 
 #if defined(ARDUINO)
@@ -551,16 +549,15 @@ void MotorManager::SleepRegister::apply()
   uint8_t pattern = 0;
   for (std::size_t channel = 0; channel < MotorManager::kMotorCount; ++channel)
   {
-    bool asleep = states_[channel];
-    bool output = activeHigh_ ? asleep : !asleep;
-    if (output)
+    bool awake = !states_[channel];
+    if (awake)
     {
       pattern |= static_cast<uint8_t>(1U << channel);
     }
   }
 
   digitalWrite(pins_.latch, LOW);
-  shiftOut(pins_.data, pins_.clock, MSBFIRST, pattern);
+  shiftOut(pins_.data, pins_.clock, LSBFIRST, pattern);
   digitalWrite(pins_.latch, HIGH);
 #endif
 }

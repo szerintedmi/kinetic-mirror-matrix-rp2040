@@ -15,12 +15,14 @@ We're continuing our implementation of Core Mirror Control Deck by implementing 
   - [ ] 3.3 Update hardware validation checklist to include autosleep verification, limit enforcement, and error-report review, referencing reused prototype behaviors where applicable.
   - [ ] 3.4 Capture a short reuse summary noting how the ESP32 prototype informed verification scripts for future auditors.
   - [ ] 3.5 Run only the tests from 1.1, 2.1, and 3.1 to confirm feature readiness; do not execute unrelated suites.
+  - [ ] 3.6 Cross-check that the centralized RP2040 GPIO mapping header (`boards/Rp2040Pins.hpp`) is documented for lab operators (note file path in checklist/reuse summary).
 
 **Acceptance Criteria:**
 
 - Integration tests cover the full command flow from serial issuance to motor state updates and status reporting.
 - Smoke script automates homing/motion cycles and captures logs for lab operators following standards.
 - Hardware checklist reflects new behaviors and can be followed without IDE access.
+- Hardware validation artifacts call out the single source of truth for STEP/DIR and shift-register pin constants so technicians can verify wiring.
 - Reuse summary and checklist clearly state which prototype concepts were adopted or adjusted.
 - Combined focused tests from groups 1-3 pass consistently on native or hardware-in-loop targets.
 

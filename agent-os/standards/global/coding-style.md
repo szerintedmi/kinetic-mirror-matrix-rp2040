@@ -22,6 +22,13 @@
 - **Comment intentionally**: Let names carry intent; add brief comments only when behavior would surprise a reader. When complexity requires add high level concise overview to explain large sections of code logic.
 - **Don't comment changes or fixes**: Do not leave code comments that speak to recent or temporary changes or fixes. Comments should be evergreen informational texts that are relevant far into the future.
 
+## Markdown formatting best practices
+
+- Make sure to strictly adhere markdown formatting rules
+- Especially pay attenttion to the following:
+  - Headings should be surrounded by blank lines
+  - Lists should be surrounded by blank lines
+
 ## Logging
 
 - **Purposeful logs**: Route logs through lightweight macros / functions so verbosity can be tuned per build profile, environment or configuration.

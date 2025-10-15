@@ -105,7 +105,7 @@ public:
 
   void markCommandExecuted(std::size_t channel);
 
-  void configureShiftRegister(const ShiftRegisterPins &pins, bool activeHigh = false);
+  void configureShiftRegister(const ShiftRegisterPins &pins);
 
   void exportCommandBuffer(std::size_t channel, pio::CommandBuffer &out) const;
 
@@ -141,13 +141,12 @@ private:
   public:
     SleepRegister() = default;
 
-    void configure(const ShiftRegisterPins &pins, bool activeHigh);
+    void configure(const ShiftRegisterPins &pins);
     void setChannel(std::size_t channel, bool asleep);
     void apply();
 
   private:
     bool configured_ = false;
-    bool activeHigh_ = false;
     ShiftRegisterPins pins_{};
     std::array<bool, MotorManager::kMotorCount> states_{};
   };
@@ -168,7 +167,6 @@ private:
   std::array<uint8_t, kMotorCount> activeSlot_{};
   std::array<ActivePlan, kMotorCount> plans_{};
   SleepRegister sleepRegister_{};
-  bool shiftActiveHigh_ = false;
   long positiveLimit_ = kDefaultLimit;
   long negativeLimit_ = -kDefaultLimit;
 };

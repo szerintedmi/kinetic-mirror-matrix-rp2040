@@ -16,6 +16,7 @@ Deliver RP2040 firmware that exposes a USB serial control deck capable of drivin
 - Implement a homing routine that leverages the configured travel range to re-establish zero and allows command overrides for approach/backoff distances while retaining default behaviors in code.
 - Manage autosleep: wake drivers immediately before motion, provide host-addressable `SLEEP`/`WAKE` verbs, and return motors to sleep as soon as motion completes.
 - Drive per-motor SLEEP pins through an SN74HC595 (or equivalent) shift register so eight drivers can be gated independently without exceeding the RP2040's available GPIO.
+- Publish a single source of truth for RP2040 GPIO usage, defining per-motor STEP/DIR pins and SN74HC595 data/clock/latch lines as maintainable compile-time constants.
 - Surface structured status on demand, including current position, motion state, sleep state, and last error/fault code.
 - Support simultaneous stewardship of eight DRV8825 channels per RP2040, isolating state and error handling per motor.
 
@@ -40,6 +41,7 @@ Deliver RP2040 firmware that exposes a USB serial control deck capable of drivin
 
 ## Technical Approach
 - **Database:** No traditional database; store default limits, speed, and acceleration as compile-time constants or `constexpr` configuration aligned with board headers. Provide runtime overrides via commands without persisting to flash in this iteration.
+- **GPIO Mapping:** Centralize motor STEP/DIR and shift-register pin selections in a dedicated header (`boards/Rp2040Pins.hpp`) so new maintainers can audit or adjust mappings without scanning core logic.
 - **API:** Implement a lightweight serial API using `<VERB>[:payload]\n` framing. Include `HELP` output listing verbs, require component-prefixed acknowledgements (`CTRL:OK`, `CTRL:ERR_CODE`), and enforce argument validation before queuing motion.
 - **Frontend:** No UI component in scope. Document serial usage and example command sequences in firmware README; host-side CLI tooling is explicitly deferred.
 - **Testing:** Create host-native unit tests for parsing, motion scheduling math, and limit enforcement. Add hardware-in-loop or smoke scripts (Python) that issue command sequences and assert responses, logging firmware git hash per hardware-validation standard.

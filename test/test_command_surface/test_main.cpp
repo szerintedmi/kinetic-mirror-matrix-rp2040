@@ -122,10 +122,13 @@ void test_status_reports_structured_channel_data()
   TEST_ASSERT_NOT_EQUAL(std::string_view::npos, status.find("STATE=MOVING"));
   TEST_ASSERT_NOT_EQUAL(std::string_view::npos, status.find("SLEEP=0"));
   TEST_ASSERT_NOT_EQUAL(std::string_view::npos, status.find("ERR=OK"));
-  TEST_ASSERT_NOT_EQUAL(std::string_view::npos, status.find("SPEED=4000"));
-  TEST_ASSERT_NOT_EQUAL(std::string_view::npos, status.find("ACC=16000"));
-  TEST_ASSERT_NOT_EQUAL(std::string_view::npos, status.find("PLAN_US="));
-  TEST_ASSERT_NOT_EQUAL(std::string_view::npos, status.find("LIMIT=0"));
+  TEST_ASSERT_GREATER_THAN_UINT32(0, processor.motorState(0).plannedDurationUs);
+
+  std::string_view profile(GetLine(response, 2));
+  TEST_ASSERT_NOT_EQUAL(std::string_view::npos, profile.find("STATUS:PROFILE"));
+  TEST_ASSERT_NOT_EQUAL(std::string_view::npos, profile.find("SPEED=4000"));
+  TEST_ASSERT_NOT_EQUAL(std::string_view::npos, profile.find("ACC=16000"));
+  TEST_ASSERT_NOT_EQUAL(std::string_view::npos, profile.find("PLAN_US="));
 
   response.count = 0;
   processor.processLine("STATUS:9", response);

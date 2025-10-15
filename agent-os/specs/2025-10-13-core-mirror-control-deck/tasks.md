@@ -45,6 +45,7 @@ Assigned roles: api-engineer, testing-engineer
   - [x] 2.5 Implement homing routine that leverages configurable travel range and defaults, ensuring overrides from serial parameters are honored.
   - [x] 2.6 Integrate autosleep: wake on motion demand, sleep immediately after motion completion, expose explicit SLEEP/WAKE verbs for calibration, and drive per-motor SLEEP lines through an SN74HC595 (or equivalent) so eight motors retain independent control without exhausting RP2040 GPIO.
   - [x] 2.7 Run only the tests from 2.1 and ensure they pass.
+  - [x] 2.8 Define RP2040 GPIO mappings (STEP/DIR per motor plus SN74HC595 data/clock/latch) in a dedicated header so hardware assignments are easy to audit and adjust.
 
 **Acceptance Criteria:**
 
@@ -52,6 +53,7 @@ Assigned roles: api-engineer, testing-engineer
 - Each RP2040 instance controls eight motors with isolated state, respecting configured limits and reporting violations.
 - Homing establishes midpoint zero and surfaces success/error codes over serial.
 - Autosleep reliably gates DRV8825 sleep pins via the SN74HC595 outputs without leaving motors energized after moves, preserving independent control across all eight channels within RP2040 GPIO limits.
+- RP2040 pin usage is centralized in documented constants that firmware and lab checklists can reference for future hardware revisions.
 - Notes in code or README explain how RP2040 implementation draws from the ESP32 FastAccelStepper prototype while acknowledging MCU-specific differences.
 
 ### Feature Validation
@@ -61,12 +63,12 @@ Assigned roles: api-engineer, testing-engineer
 **Assigned implementer:** testing-engineer  
 **Dependencies:** Task Group 1, Task Group 2
 
-- [ ] 3.0 Validate end-to-end behavior
-  - [ ] 3.1 Write 4-6 integration tests or scripted sequences that issue HELP, MOVE, HOME, STATUS, and SLEEP/WAKE flows, asserting serial responses and position updates (2-8 tests max).
-  - [ ] 3.2 Extend `scripts/smoke_test.py` (or add new) to cycle through homing, motion bounds, and fault injection, logging firmware git hash and config version.
-  - [ ] 3.3 Update hardware validation checklist to include autosleep verification, limit enforcement, and error-report review, referencing reused prototype behaviors where applicable.
-  - [ ] 3.4 Capture a short reuse summary noting how the ESP32 prototype informed verification scripts for future auditors.
-  - [ ] 3.5 Run only the tests from 1.1, 2.1, and 3.1 to confirm feature readiness; do not execute unrelated suites.
+- [x] 3.0 Validate end-to-end behavior
+  - [x] 3.1 Write 4-6 integration tests or scripted sequences that issue HELP, MOVE, HOME, STATUS, and SLEEP/WAKE flows, asserting serial responses and position updates (2-8 tests max).
+  - [x] 3.2 Extend `scripts/smoke_test.py` (or add new) to cycle through homing, motion bounds, and fault injection, logging firmware git hash and config version.
+  - [x] 3.3 Update hardware validation checklist to include autosleep verification, limit enforcement, and error-report review, referencing reused prototype behaviors where applicable.
+  - [x] 3.4 Capture a short reuse summary noting how the ESP32 prototype informed verification scripts for future auditors.
+  - [x] 3.5 Run only the tests from 1.1, 2.1, and 3.1 to confirm feature readiness; do not execute unrelated suites.
 
 **Acceptance Criteria:**
 

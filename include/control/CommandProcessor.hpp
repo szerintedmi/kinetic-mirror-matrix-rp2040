@@ -16,7 +16,7 @@ public:
   static constexpr std::size_t kMotorCount = motion::MotorManager::kMotorCount;
   static constexpr std::size_t kMaxCommandLength = 80;
   static constexpr std::size_t kMaxVerbLength = 8;
-  static constexpr std::size_t kMaxResponseLines = 10;
+  static constexpr std::size_t kMaxResponseLines = 18;
   static constexpr std::size_t kMaxResponseLineLength = 96;
   static constexpr int32_t kDefaultSpeedHz = motion::MotorManager::kDefaultSpeedHz;
   static constexpr int32_t kDefaultAcceleration = motion::MotorManager::kDefaultAcceleration;
@@ -52,9 +52,12 @@ public:
   void reset();
 
   void processLine(std::string_view rawLine, Response &out);
+  void service(uint32_t elapsedMicros);
+  void configureShiftRegister(const motion::ShiftRegisterPins &pins);
 
   const MotorState &motorState(std::size_t index) const { return motorManager_.state(index); }
   ResponseCode lastResponse(std::size_t index) const { return lastResponseCodes_[index]; }
+  motion::MotorManager &motorManager() { return motorManager_; }
 
 private:
   static constexpr std::size_t kMaxTokens = 4;
@@ -85,4 +88,3 @@ private:
 };
 
 } // namespace ctrl
-
